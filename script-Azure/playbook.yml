@@ -21,3 +21,7 @@
     - name: Instalar Django
       command: python Django-1.6.1/setup.py install
                creates=/usr/local/lib/python2.7/dist-packages/django
+    - name: Desplegar fuentes de la aplicación
+      git: repo=https://github.com/leocm89/prueba_dai.git
+           dest=/home/proyectoAzure/django_dai
+           version=prod
