@@ -178,3 +178,133 @@ Ahora lo que haremos será desplegar los códigos fuente desde github que tenemo
 Y ejecutamos la aplicación:
 
 <code>python manage.py runserver</code>
+
+#Aprovisionamiento servidor de producción#
+
+Una vez que tenemos la aplicación en un estado entregable y avanzado dentro del poco tiempo del cual hemos dispuesto, vamos a montar la siguiente máquina virtual para desplegar nuestra aplicación en ella y que pueda ser accedida desde fuera de nuestra red interna. Los pasos a llevar a cabo son los típicos, como vamos a usar la infraestructura de Windows Azure, lo primero que debemos seleccionar es la imagen que se va a instalar en dicha máquina virtual. 
+Como nuestro desarrollo lo hemos llevado a cabo en un sistema operativo Ubuntu, ahora vamos a buscar una que se asemeje y que tenga la misma compatibilidad para que no tengamos fallos.
+
+Lo primero que vamos a hacer es obtenre la lista de todas las imágenes "Ubuntu" disponibles:
+
+<code>azure vm image list</code>
+
+<img src="https://github.com/javiergama8/Images/blob/master/p18.png">
+
+Si queremos comprobar información acerca de la imagen que vamos a descargar para estar seguros de que es la que queremos con seguridad, solamente tendremos que ejecutar lo siguiente:
+
+<code>azure vm image show b39f27a8b8c64d52b05eac6a62ebad85__Ubuntu-12_04_4-LTS-amd64-server-20140428-en-us-30GB</code>
+
+<img src="https://github.com/javiergama8/Images/blob/master/p19.png">
+
+Una vez que ya tenemos descargada la imagen, vamos a proceder a crear la máquina virtual. Para su creación, utilizaremos el siguiente comando:
+
+<code>azure vm create proyectoAzure b39f27a8b8c64d52b05eac6a62ebad85__Ubuntu-12_04_4-LTS-amd64-server-20140428-en-us-30GB proyectoAzure userJavi8= --location "West Europe" --ssh</code>
+
+<img src="https://github.com/javiergama8/Images/blob/master/p20.png">
+
+donde:
+	+ nombre del host: proyecto
+	+ nombre de la imagen que vamos a instalar: b39f27a8b8c64d52b05eac6a62ebad85__Ubuntu-14_04-LTS-amd64-server-20140414-en-us-30GB
+	+ una contraseña
+	+ la localización: --location "West Europe"  
+	+ conexión mediante SSH: --ssh
+	
+Ahora que ya ha finalizado la creación de la máquina, vamos a arrancarla:
+
+<code>azure vm start proyectoAzure</code>
+
+<img src="https://github.com/javiergama8/Images/blob/master/p21.png">
+
+Mediante SSH comprobaremos que tenemos acceso a dichar máquina:
+
+<code>ssh proyectoAzure@proyectoAzure.cloudapp.net</code>
+
+<img src="https://github.com/javiergama8/Images/blob/master/p22.png">
+
+Al igual que en nuestro servidor de pruebas, copiamos nuestro archivo de clave pública al servidor de producción para poder acceder a él directamente.
+
+<code>ssh-copy-id proyectoAzure@proyectoAzure.cloudapp.net</code>
+
+<img src="https://github.com/javiergama8/Images/blob/master/p24.png">
+
+<code>ssh proyectoAzure@proyectoAzure.cloudapp.net</code>
+
+<img src="https://github.com/javiergama8/Images/blob/master/p25.png">
+
+Una vez hecho todo esto, vamos a pasar a hacer uso de Ansible.
+
+Lo primero que vamos a hacer, es crear el archivo **ansible_host** cuyo contenido es el siguiente:
+
+<code>
+[proyectoAzure]
+proyectoAzure.cloudapp.net
+</code>
+
+<img src="https://github.com/javiergama8/Images/blob/master/p26.png">
+
+Ahora tenemos que crear el playbook que le indique a Ansible las acciones que tiene que llevar a cabo en el servidor remoto. El playbook.yml contendrá lo siguiente:
+
+~~~
+---
+---
+- hosts: asdfteam
+  sudo: yes
+  remote_user: asdfteam
+  tasks:
+    - name: Actualizar lista de paquetes de los repositorios
+      apt: update_cache=yes
+    - name: Instalar Git
+      apt: name=git state=present
+    - name: Instalar Python
+      apt: name=python state=present
+    - name: Instalar Wget
+      apt: name=wget state=present
+    - name: Descargar Django
+      command: wget https://www.djangoproject.com/m/releases/1.6/Django-1.6.1.tar.gz 
+               creates=/usr/local/lib/python2.7/dist-packages/django
+    - name: Descomprimir Django
+      command: tar xzf Django-1.6.1.tar.gz
+               creates=/usr/local/lib/python2.7/dist-packages/django
+    - name: Instalar Django
+      command: python Django-1.6.1/setup.py install
+               creates=/usr/local/lib/python2.7/dist-packages/django
+    - name: Desplegar fuentes de la aplicación
+      git: repo=https://github.com/leocm89/prueba_dai.git
+           dest=/home/proyectoAzure/django_dai
+           version=prod
+    - name: Cambiar propietario de la carpeta de la aplicacion
+      command: chown -R asdfteam:asdfteam /home/proyectoAzure/django_dai
+    - name: Crear servicio upstart
+      template: src=inicio.conf dest=/etc/init/inicio.conf owner=root group=root mode=0644
+    - name: Iniciar aplicación
+      service: name=trad state=restarted
+~~~
+
+
++ Contenido **inicio.conf**
+
+~~~
+stop on runlevel [!2345]
+
+# Reiniciamos si se para
+respawn
+
+script
+    cd /home/proyectoAzure/django_dai
+    python manage.py runserver 0.0.0.0:8000
+end script
+~~~
+
+Ahora lo ejecutaremos con ansible mediante el comando:
+
+<code>ansible-playbook asdfteam.yml</code>
+
+Para poder probar la aplicación, primero necesitamos añadir un extremo a la máquina virtual que nos permita conectarnos a ella. Para ello, vamos a ejecutar los siguientes comandos:
+
+<code>azure vm endpoint create -n http proyectoAzure 80 8000</code>
+
+<img src="https://github.com/javiergama8/Images/blob/master/p27.png">
+
+<code>azure vm endpoint list proyectoAzure</code>
+
+<img src="https://github.com/javiergama8/Images/blob/master/p28.png">
