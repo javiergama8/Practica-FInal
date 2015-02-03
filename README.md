@@ -247,9 +247,9 @@ Ahora tenemos que crear el playbook que le indique a Ansible las acciones que ti
 ~~~
 ---
 ---
-- hosts: asdfteam
+- hosts: proyectoAzure
   sudo: yes
-  remote_user: asdfteam
+  remote_user: proyectoAzure
   tasks:
     - name: Actualizar lista de paquetes de los repositorios
       apt: update_cache=yes
