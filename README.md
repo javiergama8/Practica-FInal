@@ -76,7 +76,7 @@ Seguidamente comprobaremos que nos podemos conectar a la máquina mediante *ssh*
 
 Para no tener problemas más adelante en la aplicación de la configuración con Ansible, vamos a proceder a  copiar nuestro archivo de clave pública en la máquina virtual. De esta manera, podremos acceder directamente a ella. Para realizar este paso hemos ejecutado:
 
-<code>ssh-copy-id vagrant@192.168.2.50</code>
+<code>ssh-copy-id vagrant@192.168.2.2</code>
 
 <img src="https://github.com/javiergama8/Images/blob/master/p9.png">
 
@@ -116,10 +116,10 @@ Una vez que tengamos instalado **Ansible**, lo siguiente que haremos será modif
 
 Donde [ansible_hosts](poner aqui enlace a script) es un fichero  de inventario con la dirección de la máquina virtual a aprovisionar, para que Ansible pueda provisionarla, el cual contiene lo siguiente:
 
-<code>
+~~~
 [proyecto]
 192.168.2.2
-</code>
+~~~
 
 <img src="https://github.com/javiergama8/Images/blob/master/p13.png">
 
@@ -181,7 +181,7 @@ Y ejecutamos la aplicación:
 
 #Aprovisionamiento servidor de producción#
 
-Una vez que tenemos la aplicación en un estado entregable y avanzado dentro del poco tiempo del cual hemos dispuesto, vamos a montar la siguiente máquina virtual para desplegar nuestra aplicación en ella y que pueda ser accedida desde fuera de nuestra red interna. Los pasos a llevar a cabo son los típicos, como vamos a usar la infraestructura de Windows Azure, lo primero que debemos seleccionar es la imagen que se va a instalar en dicha máquina virtual. 
+Una vez que tenemos la aplicación en un estado avanzado dentro del poco tiempo del cual hemos dispuesto, vamos a montar la siguiente máquina virtual para desplegar nuestra aplicación en ella y que pueda ser accedida desde fuera de nuestra red interna. Los pasos a llevar a cabo son los típicos, como vamos a usar la infraestructura de Windows Azure, lo primero que debemos seleccionar es la imagen que se va a instalar en dicha máquina virtual. 
 Como nuestro desarrollo lo hemos llevado a cabo en un sistema operativo Ubuntu, ahora vamos a buscar una que se asemeje y que tenga la misma compatibilidad para que no tengamos fallos.
 
 Lo primero que vamos a hacer es obtenre la lista de todas las imágenes "Ubuntu" disponibles:
@@ -198,28 +198,31 @@ Si queremos comprobar información acerca de la imagen que vamos a descargar par
 
 Una vez que ya tenemos descargada la imagen, vamos a proceder a crear la máquina virtual. Para su creación, utilizaremos el siguiente comando:
 
-<code>azure vm create proyectoAzure b39f27a8b8c64d52b05eac6a62ebad85__Ubuntu-12_04_4-LTS-amd64-server-20140428-en-us-30GB proyectoAzure userJavi8= --location "West Europe" --ssh</code>
+<code>azure vm create proyectoAzure b39f27a8b8c64d52b05eac6a62ebad85__Ubuntu-12_04_4-LTS-amd64-server-20140428-en-us-30GB proyectoAzure PASSWORD --location "West Europe" --ssh</code>
 
 <img src="https://github.com/javiergama8/Images/blob/master/p20.png">
 
 donde:
+
 	+ nombre del host: proyecto
+	
 	+ nombre de la imagen que vamos a instalar: b39f27a8b8c64d52b05eac6a62ebad85__Ubuntu-14_04-LTS-amd64-server-20140414-en-us-30GB
+
 	+ una contraseña
+
 	+ la localización: --location "West Europe"  
+
 	+ conexión mediante SSH: --ssh
 	
 Ahora que ya ha finalizado la creación de la máquina, vamos a arrancarla:
 
 <code>azure vm start proyectoAzure</code>
 
-<img src="https://github.com/javiergama8/Images/blob/master/p21.png">
+<img src="https://github.com/javiergama8/Images/blob/master/p22.png">
 
 Mediante SSH comprobaremos que tenemos acceso a dichar máquina:
 
 <code>ssh proyectoAzure@proyectoAzure.cloudapp.net</code>
-
-<img src="https://github.com/javiergama8/Images/blob/master/p22.png">
 
 Al igual que en nuestro servidor de pruebas, copiamos nuestro archivo de clave pública al servidor de producción para poder acceder a él directamente.
 
@@ -272,32 +275,22 @@ Ahora tenemos que crear el playbook que le indique a Ansible las acciones que ti
       git: repo=https://github.com/leocm89/prueba_dai.git
            dest=/home/proyectoAzure/django_dai
            version=prod
-    - name: Cambiar propietario de la carpeta de la aplicacion
-      command: chown -R asdfteam:asdfteam /home/proyectoAzure/django_dai
-    - name: Crear servicio upstart
-      template: src=inicio.conf dest=/etc/init/inicio.conf owner=root group=root mode=0644
-    - name: Iniciar aplicación
-      service: name=trad state=restarted
 ~~~
 
 
-+ Contenido **inicio.conf**
++ Contenido **django.sh**
 
 ~~~
-stop on runlevel [!2345]
+#!/bin/bash
 
-# Reiniciamos si se para
-respawn
-
-script
     cd /home/proyectoAzure/django_dai
     python manage.py runserver 0.0.0.0:8000
-end script
+
 ~~~
 
 Ahora lo ejecutaremos con ansible mediante el comando:
 
-<code>ansible-playbook asdfteam.yml</code>
+<code>ansible-playbook playbook.yml</code>
 
 Para poder probar la aplicación, primero necesitamos añadir un extremo a la máquina virtual que nos permita conectarnos a ella. Para ello, vamos a ejecutar los siguientes comandos:
 
